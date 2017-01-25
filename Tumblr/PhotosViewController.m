@@ -8,23 +8,21 @@
 
 #import "ImageCell.h"
 #import "PhotosViewController.h"
+#import "PhotoDetailsViewController.h"
 #import <AFNetworking/UIImageView+AFNetworking.h>
 
-@interface PhotosViewController () <UITableViewDataSource>
+@interface PhotosViewController () <UITableViewDataSource, UITableViewDelegate>
 @property (weak, nonatomic) IBOutlet UITableView *photoTableView;
 
 @property (strong, nonatomic) NSArray *posts;
+
+@property (nonatomic, strong) UIRefreshControl *refreshControl;
 
 @end
 
 @implementation PhotosViewController
 
-- (void)viewDidLoad {
-    [super viewDidLoad];
-    // Do any additional setup after loading the view, typically from a nib.
-    
-    self.photoTableView.dataSource = self;
-    
+- (void)onRefresh {
     NSString *apiKey = @"Q6vHoaVm5L1u2ZAW1fqv3Jw48gFzYVg9P0vH0VHl3GVy6quoGV";
     NSString *urlString =
     [@"https://api.tumblr.com/v2/blog/humansofnewyork.tumblr.com/posts/photo?api_key=" stringByAppendingString:apiKey];
@@ -41,6 +39,8 @@
                                             completionHandler:^(NSData * _Nullable data,
                                                                 NSURLResponse * _Nullable response,
                                                                 NSError * _Nullable error) {
+                                                [self.refreshControl endRefreshing];
+
                                                 if (!error) {
                                                     NSError *jsonError = nil;
                                                     NSDictionary *responseDictionary =
@@ -55,9 +55,22 @@
                                                     NSLog(@"An error occurred: %@", error.description);
                                                 }
                                             }];
-    
-    self.photoTableView.rowHeight = 320;
     [task resume];
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view, typically from a nib.
+    
+    self.refreshControl = [[UIRefreshControl alloc] init];
+    [self.refreshControl addTarget:self action:@selector(onRefresh) forControlEvents:UIControlEventValueChanged];
+    [self.photoTableView insertSubview:self.refreshControl atIndex:0];
+    
+    self.photoTableView.dataSource = self;
+    self.photoTableView.delegate = self;
+    self.photoTableView.rowHeight = 320;
+    
+    [self onRefresh];
 }
 
 - (void)didReceiveMemoryWarning {
@@ -74,6 +87,18 @@
     [cell.image setImageWithURL:[NSURL URLWithString:self.posts[indexPath.row][@"photos"][0][@"original_size"][@"url"]]];
     
     return cell;
+}
+
+- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
+    PhotoDetailsViewController *photoDetailsViewController = [segue destinationViewController];
+    
+    NSIndexPath *indexPath = [self.photoTableView indexPathForCell:sender];
+    
+    photoDetailsViewController.photoUrl = [NSURL URLWithString:self.posts[indexPath.row][@"photos"][0][@"original_size"][@"url"]];
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
 }
 
 @end
